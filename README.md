@@ -55,7 +55,7 @@ Included:
 - **UptimeRobot Type**
 - **UptimeRobot Status Page Status**
 
-##Work in Progress
+## Work in Progress
 
 - **Logs for the individual monitors are still being worked on.**
 - **If you have suggestions, please leave them in an issue or a pull request.**
