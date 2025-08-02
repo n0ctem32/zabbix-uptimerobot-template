@@ -1,6 +1,6 @@
 # Zabbix Template for UptimeRobot Monitoring
 
-This Zabbix template allows you to monitor [UptimeRobot](https://uptimerobot.com/) Monitors and Status Pages via their API.
+This Zabbix template allows you to monitor [UptimeRobot](https://uptimerobot.com/) Monitors and Status Pages via their [API](https://uptimerobot.com/api/legacy/#parameters).
 
 ## Features
 
