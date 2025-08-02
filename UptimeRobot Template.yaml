@@ -1,0 +1,701 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: a26298b5d0864a75a6a99fc36c8cdfba
+      template: UptimeRobot
+      name: UptimeRobot
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: f06288c62b574aada5cdae9e7346b676
+          name: 'Uptime Robot Raw JSON for Monitors'
+          type: HTTP_AGENT
+          key: uptimerobot.discovery.monitors
+          delay: 2m
+          value_type: CHAR
+          url: 'https://api.uptimerobot.com/v2/getMonitors'
+          posts: 'api_key={$UPTIMEROBOT_API_KEY}&format=json&all_time_uptime_ratio=1&custom_uptime_ratios=1-7-30&all_time_uptime_durations=1&custom_down_durations=1&response_times=1&response_times_average=1&logs=1'
+          headers:
+            - name: Content-Type
+              value: application/x-www-form-urlencoded
+          request_method: POST
+          tags:
+            - tag: component
+              value: raw
+        - uuid: 95ab2f61a46d443daa8a4965d23530be
+          name: 'Uptime Robot Raw JSON for Status Page'
+          type: HTTP_AGENT
+          key: uptimerobot.discovery.psp
+          delay: 2m
+          value_type: CHAR
+          url: 'https://api.uptimerobot.com/v2/getPSPs'
+          posts: 'api_key={$UPTIMEROBOT_API_KEY}&format=json'
+          headers:
+            - name: Content-Type
+              value: application/x-www-form-urlencoded
+          request_method: POST
+          tags:
+            - tag: component
+              value: raw
+      discovery_rules:
+        - uuid: 2dd5f985f6474e988259d64345c702e3
+          name: 'UptimeRobot Monitor Discovery'
+          type: DEPENDENT
+          key: uptimerobot.monitor.discovery.lld
+          item_prototypes:
+            - uuid: fc03cf820dbe4bf098a41ffed8d655ea
+              name: 'Monitor: {#MONITOR_NAME} Logs'
+              type: DEPENDENT
+              key: 'ptimerobot.logs[{#MONITOR_ID}]'
+              value_type: LOG
+              description: 'Logs of the monitor.'
+              logtimefmt: unixtime
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].logs'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: logs
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 67e1c780f7dc48fc91c69cec085f3368
+              name: 'Monitor: {#MONITOR_NAME} All Time Downtime Duration'
+              type: DEPENDENT
+              key: 'uptimerobot.alltimedowntimeduration[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The duration of all time "down" events in seconds.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return null;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[1]) || null;
+              master_item:
+                key: 'uptimerobot.alltimedurations[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: downtime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: ebe7cba2c9574e17a7719e5e1582b479
+              name: 'Monitor: {#MONITOR_NAME} All Time Durations'
+              type: DEPENDENT
+              key: 'uptimerobot.alltimedurations[{#MONITOR_ID}]'
+              value_type: TEXT
+              description: 'The durations of all time up-down-paused events in seconds.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].all_time_uptime_durations'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: duration
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: ad2f0d38558c433f890cf5d3dbe3fa34
+              name: 'Monitor: {#MONITOR_NAME} All Time Paused Duration'
+              type: DEPENDENT
+              key: 'uptimerobot.alltimepausedduration[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The duration of all time "paused" events in seconds.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[2]) || 0;
+              master_item:
+                key: 'uptimerobot.alltimedurations[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: paused
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 12ce2774f008454f9eedcea29fe4a5c1
+              name: 'Monitor: {#MONITOR_NAME} All Time Uptime Duration'
+              type: DEPENDENT
+              key: 'uptimerobot.alltimeuptimeduration[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The duration of all time "up" events in seconds.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return null;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[0]) || null;
+              master_item:
+                key: 'uptimerobot.alltimedurations[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: uptime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 22655a085791462e9f3e4ff445975dbd
+              name: 'Monitor: {#MONITOR_NAME} All Time Uptime Ratio'
+              type: DEPENDENT
+              key: 'uptimerobot.alltimeuptimeratio[{#MONITOR_ID}]'
+              value_type: FLOAT
+              trends: '0'
+              units: '%'
+              description: 'The uptime ratio of the monitor calculated since the monitor is created.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].all_time_uptime_ratio'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: uptime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 70602bf7a537497b9c1610f6f0a54aa1
+              name: 'Monitor: {#MONITOR_NAME} Average Response Time'
+              type: DEPENDENT
+              key: 'uptimerobot.averageresponsestime[{#MONITOR_ID}]'
+              trends: '0'
+              units: ms
+              description: 'The average value of the response times.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].average_response_time'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: network
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 05c3ca4f85f84eeeaca9da5110145b30
+              name: 'Monitor: {#MONITOR_NAME} Downtime Duration (1d)'
+              type: DEPENDENT
+              key: 'uptimerobot.downtimeduration1d[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The downtime duration of the monitor for 1 day.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[0]) || 0;
+              master_item:
+                key: 'uptimerobot.downtimeduration[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: downtime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 91c5b6f8c6ba4c1886af248bdeecff8b
+              name: 'Monitor: {#MONITOR_NAME} Downtime Duration (7d)'
+              type: DEPENDENT
+              key: 'uptimerobot.downtimeduration7d[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The downtime duration of the monitor for 7 days.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[1]) || 0;
+              master_item:
+                key: 'uptimerobot.downtimeduration[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: downtime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 86e8cadeac0b434ca701180f412b5925
+              name: 'Monitor: {#MONITOR_NAME} Downtime Duration (30d)'
+              type: DEPENDENT
+              key: 'uptimerobot.downtimeduration30d[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The downtime duration of the monitor for 30 days.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[2]) || 0;
+              master_item:
+                key: 'uptimerobot.downtimeduration[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: downtime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: a0a3ac01eb5a49a9aa563ca42ce373b0
+              name: 'Monitor: {#MONITOR_NAME} Downtime Duration'
+              type: DEPENDENT
+              key: 'uptimerobot.downtimeduration[{#MONITOR_ID}]'
+              value_type: TEXT
+              description: 'The down durations of the monitor for the given periods in seconds(if there is more than 1 period, then the values are seperated with "-")'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].custom_down_durations'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: duration
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 919b2f03a51540399a240f7f7d1a997b
+              name: 'Monitor: {#MONITOR_NAME} Friendly Name'
+              type: DEPENDENT
+              key: 'uptimerobot.friendlyname[{#MONITOR_ID}]'
+              value_type: CHAR
+              description: 'The friendly name of the monitor.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].friendly_name'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: name
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: ed76202f1b0a4b3284eee409759e9b03
+              name: 'Monitor: {#MONITOR_NAME} Interval'
+              type: DEPENDENT
+              key: 'uptimerobot.interval[{#MONITOR_ID}]'
+              trends: '0'
+              units: s
+              description: 'The interval for the monitoring check (300 seconds by default).'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].interval'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: interval
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: a8d8cb65a08e48218a1f2076e4a3e021
+              name: 'Monitor: {#MONITOR_NAME} Name'
+              type: DEPENDENT
+              key: 'uptimerobot.name[{#MONITOR_ID}]'
+              value_type: CHAR
+              description: 'The URL/IP of the monitor.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].url'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: name
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: da2e2c6577ea433cad175c72dd5f00e5
+              name: 'Monitor: {#MONITOR_NAME} Status'
+              type: DEPENDENT
+              key: 'uptimerobot.status[{#MONITOR_ID}]'
+              trends: '0'
+              description: 'The status of the monitor.'
+              valuemap:
+                name: 'UptimeRobot Status'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].status'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: status
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+              trigger_prototypes:
+                - uuid: 866ca226c1224e1c9fb7f2ac30568303
+                  expression: 'last(/UptimeRobot/uptimerobot.status[{#MONITOR_ID}],#1)=9 or last(/UptimeRobot/uptimerobot.status[{#MONITOR_ID}],#1)=8'
+                  name: 'Monitor: {#MONITOR_NAME} is Down or Seems Down'
+                  priority: HIGH
+                  description: 'The monitor is down or seems down.'
+                  tags:
+                    - tag: monitor
+                      value: '{#MONITOR_NAME}'
+                    - tag: scope
+                      value: availability
+                - uuid: 9e40d4a68d1c4b9a91204206735d9c18
+                  expression: 'last(/UptimeRobot/uptimerobot.status[{#MONITOR_ID}],#1)=1'
+                  name: 'Monitor: {#MONITOR_NAME} is Not Checked Yet'
+                  priority: WARNING
+                  description: 'The monitor is not checked yet.'
+                  tags:
+                    - tag: monitor
+                      value: '{#MONITOR_NAME}'
+                    - tag: scope
+                      value: availability
+                - uuid: 29225902923147a59d3aa26ba0f2370e
+                  expression: 'last(/UptimeRobot/uptimerobot.status[{#MONITOR_ID}],#1)=0'
+                  name: 'Monitor: {#MONITOR_NAME} is Paused'
+                  priority: WARNING
+                  description: 'The monitor is paused.'
+                  tags:
+                    - tag: monitor
+                      value: '{#MONITOR_NAME}'
+                    - tag: scope
+                      value: availability
+            - uuid: ce9b979606d74b50b0195d7165abcd87
+              name: 'Monitor: {#MONITOR_NAME} Type'
+              type: DEPENDENT
+              key: 'uptimerobot.type[{#MONITOR_ID}]'
+              value_type: CHAR
+              description: 'The type of the monitor.'
+              valuemap:
+                name: 'UptimeRobot Type'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].type'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: type
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 9042cb282e0a489fa07e26954d6fd73e
+              name: 'Monitor: {#MONITOR_NAME} Uptime Ratio (1d)'
+              type: DEPENDENT
+              key: 'uptimerobot.uptime1d[{#MONITOR_ID}]'
+              value_type: FLOAT
+              trends: '0'
+              units: '%'
+              description: 'The uptime ratio of the monitor for 1 day.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[0]) || 0;
+              master_item:
+                key: 'uptimerobot.uptime[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: uptime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 0536ee60ad3e4c5da350ed0888ef0463
+              name: 'Monitor: {#MONITOR_NAME} Uptime Ratio (7d)'
+              type: DEPENDENT
+              key: 'uptimerobot.uptime7d[{#MONITOR_ID}]'
+              value_type: FLOAT
+              trends: '0'
+              units: '%'
+              description: 'The uptime ratio of the monitor for 7 days.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[1]) || 0;
+              master_item:
+                key: 'uptimerobot.uptime[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: uptime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 5526d4189c8041e0b4a09fd774cfb5ca
+              name: 'Monitor: {#MONITOR_NAME} Uptime Ratio (30d)'
+              type: DEPENDENT
+              key: 'uptimerobot.uptime30d[{#MONITOR_ID}]'
+              value_type: FLOAT
+              trends: '0'
+              units: '%'
+              description: 'The uptime ratio of the monitor for 30 days.'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      if (!value) return 0;
+                      var parts = value.toString().split("-");
+                      return parseFloat(parts[2]) || 0;
+              master_item:
+                key: 'uptimerobot.uptime[{#MONITOR_ID}]'
+              tags:
+                - tag: component
+                  value: uptime
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+            - uuid: 95990022c7a64ddf8cee86eacbe1a147
+              name: 'Monitor: {#MONITOR_NAME} Uptime Ratio'
+              type: DEPENDENT
+              key: 'uptimerobot.uptime[{#MONITOR_ID}]'
+              value_type: TEXT
+              description: 'The uptime ratio of the monitor for the given periods (if there is more than 1 period, then the values are seperated with "-")'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.monitors[?(@.id=={#MONITOR_ID})].custom_uptime_ratio'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.monitors
+              tags:
+                - tag: component
+                  value: ratio
+                - tag: monitor
+                  value: '{#MONITOR_NAME}'
+          master_item:
+            key: uptimerobot.discovery.monitors
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.monitors
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var monitors = JSON.parse(value);
+                  var result = {"data": []};
+                  for (var i = 0; i < monitors.length; i++) {
+                       result.data.push({
+                                        "{#MONITOR_ID}": monitors[i].id,
+                                        "{#MONITOR_NAME}": monitors[i].friendly_name,
+                                        "{#MONITOR_URL}": monitors[i].url || "",
+                                        "{#MONITOR_STATUS}": monitors[i].status
+                                      });
+                                    }
+                                    return JSON.stringify(result);
+        - uuid: ad31de7b0bd74d62879fa76a4872e999
+          name: 'UptimeRobot Status Page Discovery'
+          type: DEPENDENT
+          key: uptimerobot.statuspage.discovery.lld
+          item_prototypes:
+            - uuid: 65c67dfa3298408b911c90fafefc7347
+              name: 'PSP: {#PSP_NAME} Status Page Custom URL'
+              type: DEPENDENT
+              key: 'uptimerobot.customurlpsp[{#PSP_ID}]'
+              value_type: CHAR
+              description: 'The custom url of the status page.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.psps[?(@.id=={#PSP_ID})].custom_url'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.psp
+              tags:
+                - tag: component
+                  value: url
+                - tag: psp
+                  value: '{#PSP_NAME}'
+            - uuid: 98ef798f7b5f49978767236e70b8029f
+              name: 'PSP: {#PSP_NAME} Status Page Monitors'
+              type: DEPENDENT
+              key: 'uptimerobot.monitorspsp[{#PSP_ID}]'
+              value_type: CHAR
+              description: 'The list of monitorIDs to be displayed in status page (the values are seperated with "-" or 0 for all monitors).'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.psps[?(@.id=={#PSP_ID})].monitors'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.psp
+              tags:
+                - tag: component
+                  value: monitors
+                - tag: psp
+                  value: '{#PSP_NAME}'
+            - uuid: 02b6ff06fb764ba78c63cff1361c132e
+              name: 'PSP: {#PSP_NAME} Status Page Name'
+              type: DEPENDENT
+              key: 'uptimerobot.namepsp[{#PSP_ID}]'
+              value_type: CHAR
+              description: 'The friendly name of the status page.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.psps[?(@.id=={#PSP_ID})].friendly_name'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.psp
+              tags:
+                - tag: component
+                  value: name
+                - tag: psp
+                  value: '{#PSP_NAME}'
+            - uuid: 5e0383d527254253aab83470decd22d1
+              name: 'PSP: {#PSP_NAME} Status Page Status'
+              type: DEPENDENT
+              key: 'uptimerobot.statuspsp[{#PSP_ID}]'
+              value_type: CHAR
+              description: 'The status of the status page.'
+              valuemap:
+                name: 'UptimeRobot Status Page Status'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.psps[?(@.id=={#PSP_ID})].status'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.psp
+              tags:
+                - tag: component
+                  value: status
+                - tag: psp
+                  value: '{#PSP_NAME}'
+              trigger_prototypes:
+                - uuid: 921cd4dd0ae84d44bf3790f962129084
+                  expression: 'last(/UptimeRobot/uptimerobot.statuspsp[{#PSP_ID}],#1)=0'
+                  name: 'Status page: {#PSP_NAME} is Down'
+                  priority: WARNING
+                  description: 'The status page is down.'
+                  tags:
+                    - tag: psp
+                      value: '{#PSP_NAME}'
+                    - tag: scope
+                      value: availability
+            - uuid: 729127428ba14afab97397817861cb01
+              name: 'PSP: {#PSP_NAME} Status Page URL'
+              type: DEPENDENT
+              key: 'uptimerobot.urlpsp[{#PSP_ID}]'
+              value_type: CHAR
+              description: 'The standard url of the status page.'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.psps[?(@.id=={#PSP_ID})].standard_url'
+                - type: JSONPATH
+                  parameters:
+                    - '$[0]'
+              master_item:
+                key: uptimerobot.discovery.psp
+              tags:
+                - tag: component
+                  value: url
+                - tag: psp
+                  value: '{#PSP_NAME}'
+          master_item:
+            key: uptimerobot.discovery.psp
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.psps
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var psps = JSON.parse(value);
+                  var result = {"data": []};
+                  for (var i = 0; i < psps.length; i++) {
+                       result.data.push({
+                                        "{#PSP_ID}": psps[i].id,
+                                        "{#PSP_NAME}": psps[i].friendly_name,
+                                        "{#PSP_URL}": psps[i].url || "",
+                                        "{#PSP_STATUS}": psps[i].status
+                                      });
+                                    }
+                                    return JSON.stringify(result);
+      tags:
+        - tag: class
+          value: website
+        - tag: target
+          value: UptimeRobot
+      macros:
+        - macro: '{$UPTIMEROBOT_API_KEY}'
+          value: '''YOUR_API_KEY'''
+          description: u2987218-9fbe2ae68d0dfd1b221bbd3a
+      valuemaps:
+        - uuid: 57b9b4ee64084c33bf4a6995e7f9c5ff
+          name: 'UptimeRobot Status'
+          mappings:
+            - value: '0'
+              newvalue: Paused
+            - value: '1'
+              newvalue: 'Not Checked'
+            - value: '2'
+              newvalue: Up
+            - value: '8'
+              newvalue: 'Seems Down'
+            - value: '9'
+              newvalue: Down
+        - uuid: 49c35f2d1e4a4e9cbbc23a3e98aaad03
+          name: 'UptimeRobot Status Page Status'
+          mappings:
+            - value: '0'
+              newvalue: Paused
+            - value: '1'
+              newvalue: Active
+        - uuid: 2ec2c903aaf141be8218f020b11613f6
+          name: 'UptimeRobot Type'
+          mappings:
+            - value: '1'
+              newvalue: HTTP(s)
+            - value: '2'
+              newvalue: Keyword
+            - value: '3'
+              newvalue: Ping
+            - value: '4'
+              newvalue: Port
+            - value: '5'
+              newvalue: Heartbeat
